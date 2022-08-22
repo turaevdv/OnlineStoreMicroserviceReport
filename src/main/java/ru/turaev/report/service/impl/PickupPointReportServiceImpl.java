@@ -14,6 +14,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @Service
 @RequiredArgsConstructor
@@ -22,9 +23,7 @@ public class PickupPointReportServiceImpl implements PickupPointReportService {
 
     @Override
     public PickupPointReport getReportByPeriod(long id, LocalDate begin, LocalDate end) {
-        if (begin.isAfter(end)) {
-            throw new DateTimeException("The beginning of the period is later than the end");
-        }
+        checkPeriod(begin, end);
         PickupPointReport pickupPointReport = new PickupPointReport();
         List<PickupPointReportPerDay> pickupPointReportPerDays = new ArrayList<>();
         int revenueForPeriod = 0;
@@ -70,16 +69,30 @@ public class PickupPointReportServiceImpl implements PickupPointReportService {
 
     @Override
     public List<Order> getAllOrdersByPeriod(long id, LocalDate begin, LocalDate end) {
-        return null;
+        checkPeriod(begin, end);
+        return orderRestConsumer.getOrderByPeriod(id, begin, end);
     }
 
     @Override
     public double getAverageReceiptByPeriod(long id, LocalDate begin, LocalDate end) {
-        return 0;
+        checkPeriod(begin, end);
+        List<Order> orders = orderRestConsumer.getOrderByPeriod(id, begin, end);
+        if (orders.size() == 0) {
+            return 0;
+        }
+        int revenue = orders.stream().flatMapToInt(order -> IntStream.of(order.getPrice())).sum();
+        return (double) revenue / orders.size();
     }
 
     @Override
     public double getNumbersOfOrderByPeriod(long id, LocalDate begin, LocalDate end) {
-        return 0;
+        checkPeriod(begin, end);
+        return orderRestConsumer.getOrderByPeriod(id, begin, end).size();
+    }
+
+    private void checkPeriod(LocalDate begin, LocalDate end) {
+        if (begin.isAfter(end)) {
+            throw new DateTimeException("The beginning of the period is later than the end");
+        }
     }
 }
