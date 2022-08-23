@@ -1,7 +1,9 @@
 package ru.turaev.report.service.impl;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import ru.turaev.report.exception.OrderNotFoundException;
 import ru.turaev.report.model.AccountingAndQuantity;
 import ru.turaev.report.model.Order;
 import ru.turaev.report.model.PickupPointReport;
@@ -16,6 +18,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PickupPointReportServiceImpl implements PickupPointReportService {
@@ -23,12 +26,13 @@ public class PickupPointReportServiceImpl implements PickupPointReportService {
 
     @Override
     public PickupPointReport getReportByPeriod(long id, LocalDate begin, LocalDate end) {
-        checkPeriod(begin, end);
+        log.info("Create an pickup point report for pickup point with id = {} from {} to {}", id, begin, end);
+        List<Order> orders = getOrderByPeriod(id, begin, end);
+
         PickupPointReport pickupPointReport = new PickupPointReport();
         List<PickupPointReportPerDay> pickupPointReportPerDays = new ArrayList<>();
         int revenueForPeriod = 0;
 
-        List<Order> orders = orderRestConsumer.getOrderByPeriod(id, begin, end);
         for (LocalDate date = begin; date.isBefore(end.plusDays(1)); date = date.plusDays(1)) {
             final LocalDate currentDay = date;
             long revenuePerDay = 0;
@@ -64,35 +68,48 @@ public class PickupPointReportServiceImpl implements PickupPointReportService {
         pickupPointReport.setPickupPointId(id);
         pickupPointReport.setPickupPointReportPerDay(pickupPointReportPerDays);
         pickupPointReport.setRevenueForPeriod(revenueForPeriod);
+        log.info("The report was created successfully");
         return pickupPointReport;
     }
 
     @Override
     public List<Order> getAllOrdersByPeriod(long id, LocalDate begin, LocalDate end) {
-        checkPeriod(begin, end);
-        return orderRestConsumer.getOrderByPeriod(id, begin, end);
+        log.info("Try to get all orders for pickup point with id = {} from {} to {}", id, begin, end);
+        return getOrderByPeriod(id, begin, end);
     }
 
     @Override
     public double getAverageReceiptByPeriod(long id, LocalDate begin, LocalDate end) {
-        checkPeriod(begin, end);
-        List<Order> orders = orderRestConsumer.getOrderByPeriod(id, begin, end);
+        log.info("Try to calculate the average receipt for pickup point with id = {} from {} to {}", id, begin, end);
+        List<Order> orders = getOrderByPeriod(id, begin, end);
         if (orders.size() == 0) {
+            log.info("There were no orders from {} to {} in the pickup point with id = {}", begin, end, id);
             return 0;
         }
         int revenue = orders.stream().flatMapToInt(order -> IntStream.of(order.getPrice())).sum();
-        return (double) revenue / orders.size();
+        double averageReceipt = (double) revenue / orders.size();
+        log.info("The average receipt for pickup point with id = {} from {} to {} is {}", id, begin, end, averageReceipt);
+        return averageReceipt;
     }
 
     @Override
     public double getNumbersOfOrderByPeriod(long id, LocalDate begin, LocalDate end) {
-        checkPeriod(begin, end);
-        return orderRestConsumer.getOrderByPeriod(id, begin, end).size();
+        return getOrderByPeriod(id, begin, end).size();
     }
 
     private void checkPeriod(LocalDate begin, LocalDate end) {
         if (begin.isAfter(end)) {
             throw new DateTimeException("The beginning of the period is later than the end");
+        }
+    }
+
+    private List<Order> getOrderByPeriod(long id, LocalDate begin, LocalDate end) {
+        checkPeriod(begin, end);
+        log.info("Try to get order data");
+        try {
+            return orderRestConsumer.getOrderByPeriod(id, begin, end);
+        } catch (Exception e) {
+            throw new OrderNotFoundException("Error when trying to get order data");
         }
     }
 }
