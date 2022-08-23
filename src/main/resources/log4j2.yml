@@ -11,6 +11,7 @@ Configuration:
         compact: true
         LocationInfo: true
         includeTimeMillis: true
+        properties: true
         keyValuePair:
           - key: environment
             value: ${env:PROFILE:-default}
